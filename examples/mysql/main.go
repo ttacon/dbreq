@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/ttacon/grog"
+	"github.com/ttacon/dbreq"
 )
 
 var (
-	dsn = flag.String("dsn", "grog:grog@/grog", "the dsn to connect to your db with")
+	dsn = flag.String("dsn", "dbreq:dbreq@/dbreq", "the dsn to connect to your db with")
 )
 
 func main() {
@@ -23,8 +23,8 @@ func main() {
 		return
 	}
 
-	grog.Init(db)
-	err = grog.Require(Epic{})
+	dbreq.Init(db)
+	err = dbreq.Require(Epic{})
 	if err != nil {
 		fmt.Println("whoops! couldn't make sure table exists due to err: ", err)
 	} else {
@@ -44,18 +44,28 @@ func (e Epic) Exist(dble interface{}) (bool, error) {
 
 	// we just want to know if the table exists at all
 	_, err := db.Query("describe epic")
-	return err != nil, err
+	return err == nil, err
 }
 
 func (e Epic) Create(dble interface{}) error {
 	// we know it's a sql database connection
 	db, _ := dble.(*sql.DB)
+	txn, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer txn.Rollback()
 
-	_, err := db.Exec(`
+	_, err = txn.Exec(`
 create table Epic (
   HowEpic int,
   TooEpic bool
 );
 `)
+	if err != nil {
+		return err
+	}
+
+	err = txn.Commit()
 	return err
 }
